@@ -1,0 +1,189 @@
+
+# Project Assignment: Self-Supervised Patch Puzzle Solver
+
+## Objective:
+The goal of this project is to train a self-supervised neural network that can reconstruct an image after a few of its patches have been randomly shuffled. This task encourages the model to learn spatial reasoning and visual context.
+
+---
+
+## Input Image Setup
+
+- Original image size: Variable
+- Resized image size: 480 × 270 pixels to maintain a 16:9 aspect ratio
+- Patch grid: 30 × 30 = 900 patches
+- Patch size: 16 × 9 pixels
+- We will shuffle 1 or more patches (based on difficulty level) and ask the model to reconstruct the original image.
+
+---
+
+## Task Levels
+
+| Level  | Description               | Patches Shuffled |
+|--------|---------------------------|------------------|
+| Easy   | Single patch shuffled     | 1                |
+| Medium | Moderate patch shuffle    | 2–3              |
+| Hard   | Complex patch disordering | 5+               |
+
+We will progressively train on these levels to evaluate generalization.
+
+---
+
+## Model Architecture
+
+###  Autoencoder (CNN-based)
+- Encoder: Convolution layers + ReLU + BatchNorm
+- Bottleneck: Dense or CNN layers
+- Decoder: Transposed convolutions to reconstruct image
+- Final output uses **Sigmoid** activation to constrain pixel values to [0, 1]
+
+Optional future upgrade: Add an attention-based bottleneck for spatial awareness.
+
+---
+
+## Directory Structure
+
+```
+puzzle_solver/
+├── data/
+│   ├── train/
+│   ├── val/
+│   └── test/
+├── utils/
+│   ├── patch_utils.py
+│   ├── image_loader.py
+│   └── conv_blocks.py
+├── models/
+│   └── autoencoder.py
+├── experiments/
+│   ├── train_easy.py
+│   ├── train_medium.py
+│   └── train_hard.py
+├── loss/
+│   └── composite_loss.py
+├── main.py
+└── README.md
+```
+
+---
+
+## Loss Function
+
+### Composite Loss:
+1. Content Loss:
+    - `MSELoss(output, original_image)` or `1 - SSIM(output, original_image)`
+2. Optional Spatial Loss (future extension):
+    - Patch-level cosine similarity between reconstructed and true positions
+3. Final Loss:
+    ```python
+    total_loss = content_loss + λ * spatial_loss
+    ```
+
+---
+
+## Evaluation Metrics
+
+- SSIM (Structural Similarity)
+- PSNR (Peak Signal-to-Noise Ratio)
+- Visual comparison of input, shuffled, and reconstructed images
+
+---
+
+## Team Responsibilities
+
+### Shardul
+
+Tasks:
+1. Define the CNN Autoencoder model in `models/autoencoder.py`
+   - The encoder should include:
+     - 3–4 convolutional layers
+     - BatchNorm + ReLU
+     - Downsampling using stride 2 or max-pooling
+   - The bottleneck can be a convolution or fully connected layer.
+   - The decoder should include:
+     - 3–4 transposed convolutional layers
+     - ReLU + BatchNorm
+     - Final layer with Sigmoid activation to generate output of size [3, 480, 270]
+
+2. Build the training scripts in `experiments/train_easy.py`, `train_medium.py`, and `train_hard.py`
+   - Load the dataset using the `PuzzleDataset` class
+   - Define the model, optimizer (Adam), loss function
+   - Save model checkpoints and validation performance using `torch.save()`
+   - Print training loss and evaluation metrics per epoch
+
+3. Implement the loss function in `loss/composite_loss.py`
+   - Include MSELoss
+   - Optionally add patch-level spatial loss using cosine similarity (optional)
+
+4. Setup experiment logging
+   - Use Python's `logging` module or simply `print()` for now
+   - Save training curves and model checkpoints
+
+---
+
+### Kavana
+
+Tasks:
+1. Implement `PatchManager` class in `utils/patch_utils.py`
+   - Initialize with `patch_size=(4,4)` and `image_size=(256,256)`
+images are already resized to 256 x 256. just need variables to be initalized here
+   - Method 1: `divide_into_patches(image)` -> return 64x64 patches as a flat list or tensor
+imagine the picture is divided by 4x4 grid. each grid or a patch consists of 64x64 pixels. this 64x64 pixel is converted to a list or tensor and similarly 16 tensors of 64x64 pixels are appended and returned as result. 
+   - Method 2: `shuffle_patches(patches, k)` -> randomly shuffle k patches and return new list.
+consider each 4096 pixels as batch and resuffle k of the 16 batches randomly
+   - Method 3: `reconstruct_image(patches)` -> reconstruct full image from tensor patch grid 
+
+2. Write the custom dataset class in `utils/image_loader.py`
+   - Create `PuzzleDataset(torch.utils.data.Dataset)` class
+   - In `__init__()`: 
+     - accept image_dir and difficulty level
+     - difficulty level = easy=> k=1, medium => k =3, difficult => k=5
+   
+   - In '__len()':
+     - return the number of images in image directory
+
+   - In `__getitem__()`:
+     - create a new shuffled_image_folder
+     - for every image in the directory path:
+     	- Load the image
+    	 - Apply the patch division
+    	 - Shuffle k patches depending on the level
+    	 - Reconstruct the image
+         - save the reconstructed image as shuffle_(original image name) in a new folder	
+
+---------------------------------------------------------------------------------------------
+
+### Nahid
+
+Tasks:
+1. Implement evaluation metrics in `utils/metrics.py`
+   - Function 1: `calculate_ssim(img1, img2)` using `pytorch_msssim` or OpenCV
+   - Function 2: `calculate_psnr(img1, img2)` using formula:  
+     `PSNR = 20 * log10(MAX_I) - 10 * log10(MSE)`
+   - Function 3 (Optional): `patch_error_map(img1, img2)` -> show difference map per patch
+
+2. Prepare dataset folders:
+   - Create `data/train`, `data/val`, and `data/test`
+   - Place 100–200 images per folder
+   - Resize all images to 256x256 (use PIL or OpenCV)
+
+3. Create a visualization script 
+   - Input: shuffled image, reconstructed image, ground truth
+   - Display all three side-by-side using `matplotlib.pyplot.imshow()`
+
+---
+
+## Extension Ideas (Future Work)
+- Superpixel-based patching instead of 64x64 grid
+- Temporal shuffling of video frames
+- Positional classification head: predict correct patch location as auxiliary task
+
+---
+
+## Final Notes
+- Images must be normalized between `[0, 1]`
+- All training scripts accept difficulty level as an argument
+- The pipeline should support easy extensibility for more complex patching schemes
+
+---
+
+### Let's build it step by step. Once each part is complete, we will integrate and test on a sample batch of 100 images.
